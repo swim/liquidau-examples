@@ -1,0 +1,41 @@
+{
+ "description": "Offline teacher labels (Clef on Cloudflare Workers AI), used to choose and stratify what people label. Training-only: never used to calibrate, threshold or certify anything. Keys are sha256 of [model, questions, prompt text truncated to 8,000 characters]; values are the probability of 'yes' per question. No prompt text is stored.",
+ "dataset": "lmsys/toxic-chat version 0124, English-only prompts (train and test files); Banking77 (PolyAI, train and test files)",
+ "license": "Derived from the datasets above, not covered by this repository's MIT licence: the clef-toxicchat-* files follow ToxicChat's CC BY-NC 4.0 (non-commercial use only); clef-banking77-clef.json follows Banking77's CC BY 4.0 (attribution: Casanueva et al., 2020).",
+ "questions": "src/teacher/questions.ts (TOXICCHAT_QUESTIONS, BANKING77_QUESTIONS); changing their wording changes every key",
+ "labelledOn": "2026-10-04",
+ "files": {
+  "clef-toxicchat-clef.json": {
+   "model": "@cf/cloudflare/clef",
+   "entries": 9304,
+   "inputTokens": 3367671,
+   "approxCostUsd": 0.81,
+   "apTestFile": {
+    "toxic": 0.878,
+    "jailbreak": 0.865
+   }
+  },
+  "clef-toxicchat-clef-flash.json": {
+   "model": "@cf/cloudflare/clef-flash",
+   "entries": 9304,
+   "inputTokens": 3367671,
+   "approxCostUsd": 0.3,
+   "apTestFile": {
+    "toxic": 0.77,
+    "jailbreak": 0.784
+   }
+  },
+  "clef-banking77-clef.json": {
+   "model": "@cf/cloudflare/clef",
+   "entries": 13072,
+   "inputTokens": 4254463,
+   "approxCostUsd": 1.02,
+   "labelledOn": "2026-10-04",
+   "apTestFile": {
+    "urgent": 0.971,
+    "refund": 0.992
+   }
+  }
+ },
+ "regenerate": "node --import tsx src/teacher/toxicchat-clef.ts [--model clef]; node --import tsx src/teacher/banking77-clef.ts  (reuse these files; only missing texts are sent)"
+}

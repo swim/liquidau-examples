@@ -1,0 +1,35 @@
+{
+  "name": "liquidau-examples",
+  "private": true,
+  "version": "0.0.0",
+  "description": "A worked example of @liquidau/rule-miner, @liquidau/embedding-classifier and @liquidau/solvers together, on the Banking77 dataset: rules, sampled evaluation sets, guaranteed thresholds and drift monitoring.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node --import tsx src/run.ts",
+    "typecheck": "tsc --noEmit",
+    "benchmark": "node --import tsx src/benchmark.ts",
+    "toxicchat": "node --import tsx src/toxicchat-run.ts",
+    "toxicchat:embed": "node --import tsx src/toxicchat-embed.ts",
+    "teacher:toxicchat": "node --import tsx src/teacher/toxicchat-clef.ts",
+    "serve:check": "node --import tsx src/serve-check.ts",
+    "release:simulate": "node --import tsx src/release-simulate.ts",
+    "export:onnx": "python3 scripts/export_layers_onnx.py .cache/onnx"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^4.3.0",
+    "@liquidau/embedding-classifier": "0.6.2",
+    "@liquidau/rule-miner": "0.5.0",
+    "@liquidau/solvers": "0.6.2",
+    "eld": "^2.1.0",
+    "stemmer": "^2.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.0"
+  }
+}

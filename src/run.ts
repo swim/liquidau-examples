@@ -17,23 +17,33 @@
  *                    embedding model), and where `urgent`'s false alarms and misses come from
  *
  * Everything is seeded: rerunning reproduces the same results.
+ *
+ * FINER=1 adds the finer-label route score to both heads (embedding-classifier's `finer` option): the
+ * labeller records each message's intent, a multinomial model over the 77 intents is fitted on the
+ * training records, and each head scores the embedding plus Σ P(intent) · the intent's route rate.
+ * Outputs then go to out/finer/, beside the default run's.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
-  assertRoundTrip, coverageReport, decide, defineAxes, designOf, monitorWindow,
-  publishPlan, reportMarkdown, scoreEmbedding, trainHeads,
+  assertRoundTrip, coverageReport, defineAxes, designOf, monitorWindow,
+  reportMarkdown, scoreEmbedding, trainHeads,
   type ClassifierArtifact, type HeadPolicy, type TrainResult,
 } from '@liquidau/embedding-classifier';
 import { disagreementQueues, evaluateFired, ruleSetHash } from '@liquidau/rule-miner';
+import { loadRouter, memorySource } from '@liquidau/router';
 import { stratifiedRatio } from '@liquidau/solvers';
 
 import { HEADS, loadBanking77, type Head, type Message } from './data.ts';
-import { EMBEDDING, makeEmbedder, SMALL_MODEL } from './embed.ts';
+import { EMBEDDING, makeEmbedder, MPNET_MODEL, walkthroughEncoder } from './embed.ts';
+import { GATES, SLICE_GATE } from './gates.ts';
 import { buildRound, lengthBucket, pct, topicOf } from './pipeline.ts';
+import { packageVersions, writeRelease } from './router-host.ts';
+import { buildRouterRelease, policyFor } from './router-release.ts';
 
-const OUT = join(import.meta.dirname, '..', 'out');
+const FINER = process.env.FINER === '1';
+const OUT = join(import.meta.dirname, '..', 'out', FINER ? 'finer' : '');
 const log = (line = '') => console.log(line);
 const section = (title: string) => log(`\n=== ${title} ===`);
 // ---------------------------------------------------------------------------------------------
@@ -52,20 +62,23 @@ const X = records.map(emb);
 // ---------------------------------------------------------------------------------------------
 section('4 train (embedding-classifier)');
 const POLICIES: Record<Head, HeadPolicy> = {
-  urgent: { kind: 'recall', targetRecall: 0.85, mode: 'design', designMethod: 'linearised', delta: 0.05, sliceGate: { minPositives: 10 } },
+  urgent: { kind: 'recall', targetRecall: 0.85, mode: 'design', designMethod: 'linearised', delta: 0.05, sliceGate: SLICE_GATE },
   // About 18 calibration positives can't certify more than 0.7: a data limit, not a defect.
   refund: { kind: 'precision', targetPrecision: 0.7, mode: 'design', delta: 0.05 },
 };
 /** One training run on the shared records and splits; embeddings and policies can vary (stage 8). */
 const train = (embedOf: (m: { id: string }) => number[], policies: Record<Head, HeadPolicy>, quiet = false) => trainHeads({
-  X: records.map(embedOf), split, records, designs: [main.design], seed: 1, calibrationAlpha: 0.01,
+  X: records.map(embedOf), split, records, designs: [main.design], seed: 1, calibrationAlpha: GATES.calibrationAlpha,
+  // FINER=1: each labelled record's intent (the finer label); the training records' fit the shared model.
+  // Its out-of-fold folds follow the paraphrase groups, so near-duplicate texts never straddle a fold.
+  ...(FINER ? { finer: { labels: records.map((r) => byId.get(r.id)!.intent) }, foldKeys: records.map((r) => r.group) } : {}),
   slices: { length: records.map((r) => lengthBucket(r.text)) },
   // Budget traffic holds urgent messages at ~4%, so its firing budget must sit above prevalence × recall.
   background: { X: budget.map(embedOf), records: budget, maxRate: { urgent: 0.08, refund: 0.04 } },
   heads: [
     // Linear heads: stage 8 compares embedding models and thresholds on the same head type.
-    { name: 'urgent', y: label('urgent'), baseline: records.map((r) => matcher.match(r.text) !== null), policy: policies.urgent, type: 'linear' },
-    { name: 'refund', y: label('refund'), policy: policies.refund, type: 'linear' },
+    { name: 'urgent', y: label('urgent'), baseline: records.map((r) => matcher.match(r.text) !== null), policy: policies.urgent, type: 'linear', finer: FINER },
+    { name: 'refund', y: label('refund'), policy: policies.refund, type: 'linear', finer: FINER },
   ],
   log: quiet ? () => {} : (l) => log(`  ${l}`),
 });
@@ -85,8 +98,8 @@ if (result.warnings.length > 8) log(`  ... ${result.warnings.length - 8} more wa
 // ---------------------------------------------------------------------------------------------
 section('5 ship');
 const artifact: ClassifierArtifact<Head> = {
-  version: '2026-10-03', created_at: '2026-10-03T00:00:00Z', embedding: EMBEDDING, heads: result.heads, evaluation: result.evaluation,
-  training: { design: result.design, provenance: result.provenance, rule_set: { version: ruleSet.version, hash: ruleSetHash(ruleSet) } },
+  version: '2026-10-03', created_at: '2026-10-03T00:00:00Z', embedding: EMBEDDING, heads: result.heads, ...(result.finer ? { finer: result.finer } : {}), evaluation: result.evaluation,
+  training: { design: result.design, provenance: result.provenance, rule_set: { version: ruleSet.version, hash: ruleSetHash(ruleSet) }, router: { ruleSetHash: ruleSetHash(ruleSet) } },
   gates: { passed: result.failures.length === 0, failures: result.failures, warnings: result.warnings },
 };
 assertRoundTrip(artifact, X, result.testProbabilities);
@@ -96,12 +109,29 @@ mkdirSync(OUT, { recursive: true });
 writeFileSync(join(OUT, 'artifact.json'), JSON.stringify(artifact));
 writeFileSync(join(OUT, 'ruleset.json'), JSON.stringify(ruleSet, null, 2));
 writeFileSync(join(OUT, 'report.md'), reportMarkdown(artifact, { title: 'Banking77 support example', baselineName: 'rules', coverage }));
-log(`wrote out/artifact.json, out/ruleset.json, out/report.md; publish plan: ${JSON.stringify(publishPlan({ gatesPassed: artifact.gates!.passed, shadowCandidate: !artifact.gates!.passed, promote: artifact.gates!.passed, generated: result.provenance?.generated }))}`);
-for (const text of ['I think someone has stolen my card and used it', 'Can I get my money back for this order?', 'What is the exchange rate today?']) {
-  const vec = (await embedder.embedMany([text]))[0];
-  const d = decide(artifact, scoreEmbedding(artifact, vec), { priority: ['urgent', 'refund'] });
-  log(`  "${text}" -> ${d.head ?? 'none'} (${d.reason}); rule: ${matcher.match(text)?.id ?? 'none'}`);
+log(`wrote ${FINER ? 'out/finer' : 'out'}/artifact.json, ruleset.json, report.md`);
+// A complete @liquidau/router release: the artifact, its rule set, the routing policy and evidence from the
+// held-out test records (each head's promise as its acceptance criterion), pinned by one manifest digest.
+const encoder = await walkthroughEncoder((texts) => embedder.embedMany([...texts]));
+const heldOut = records.filter((r) => r.role === 'test');
+const { built, final } = await buildRouterRelease({
+  releaseId: `banking77-${artifact.version}`, createdAt: artifact.created_at, artifact, ruleSet, policy: policyFor(HEADS, ['urgent', 'refund']),
+  items: heldOut.map((r) => ({ id: r.id, text: r.text, x: emb(r), labels: r.labels })),
+  dataset: { id: 'banking77-test', split: 'test', description: 'the sampled, labelled test records (stratified; rates are unweighted point estimates)' },
+  criteria: { heads: { urgent: { minRecall: 0.85 }, refund: { minPrecision: 0.7 } }, compare: 'point' },
+  embedding: encoder.identity, packages: packageVersions(),
+});
+writeRelease(join(OUT, 'release'), built);
+writeFileSync(join(OUT, 'heldout.json'), JSON.stringify(heldOut.map((r) => ({ id: r.id, labels: r.labels }))));
+const mode = built.enforcement.length ? 'shadow' : 'enforce';
+log(`router release ${built.manifest.releaseId} (manifest ${built.manifestSha256.slice(0, 12)}): ${mode === 'enforce' ? 'enforceable' : `shadow only - ${built.enforcement.join('; ')}`}; final routing on ${final.items} test records: coverage ${pct(final.coverage.rate ?? 0)}, routed accuracy ${pct(final.routedAccuracy.rate ?? 0)}`);
+const router = await loadRouter({ source: memorySource(built.files), manifestKey: built.manifestKey, expectedManifestSha256: built.manifestSha256, mode, encoder, timeoutMs: 60_000, monitoring: { sampleRate: 0, samplingSalt: 'walkthrough' } });
+for (const [i, text] of ['I think someone has stolen my card and used it', 'Can I get my money back for this order?', 'What is the exchange rate today?'].entries()) {
+  const r = await router.route({ text, requestId: `demo-${i}` });
+  const c = r.outcome === 'shadow' ? r.candidate : r;
+  log(`  "${text}" -> ${c.outcome === 'route' ? `${c.routeId} (${c.mechanism})` : c.outcome === 'unavailable' ? `unavailable ${c.code}` : `${c.outcome} (${c.reason})`}${r.embedded ? '' : ', rules only'}`);
 }
+await router.close();
 
 // ---------------------------------------------------------------------------------------------
 section('6 next round (rule-miner)');
@@ -140,7 +170,7 @@ const classifierFired = (r: TrainResult<Head>, h: Head) => {
   const p = new Map(r.testProbabilities[h]!.idx.map((i, j) => [records[i].id, r.testProbabilities[h]!.p[j]]));
   return testOf(h).map((rec) => p.get(rec.id)! >= r.heads[h]!.threshold);
 };
-const smallEmbedder = await makeEmbedder(() => {}, SMALL_MODEL);
+const smallEmbedder = await makeEmbedder(() => {}, MPNET_MODEL);
 const smallVectors = await smallEmbedder.embedMany(allTexts);
 const smallOf = new Map(messages.map((m, i) => [m.id, smallVectors[i]]));
 const heuristic: Record<Head, HeadPolicy> = {
@@ -148,9 +178,9 @@ const heuristic: Record<Head, HeadPolicy> = {
   refund: { kind: 'precision', targetPrecision: 0.7, mode: 'heuristic' },
 };
 const variants: Array<{ name: string; run: TrainResult<Head> }> = [
-  { name: `mpnet, design threshold (shipped)`, run: result },
-  { name: `mpnet, heuristic threshold`, run: train(emb, heuristic, true) },
-  { name: `MiniLM, design threshold`, run: train((m) => smallOf.get(m.id)!, POLICIES, true) },
+  { name: `EmbeddingGemma, design threshold (shipped)`, run: result },
+  { name: `EmbeddingGemma, heuristic threshold`, run: train(emb, heuristic, true) },
+  { name: `mpnet, design threshold`, run: train((m) => smallOf.get(m.id)!, POLICIES, true) },
 ];
 const rows: string[] = ['| head | approach | guarantee | recall (95% CI) | precision | false alarms |', '|---|---|---|---|---|---|'];
 const fmtRow = (h: Head, name: string, guarantee: string, m: ReturnType<typeof measure>) =>

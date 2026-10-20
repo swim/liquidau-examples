@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Liquidau Routing Examples</title>
+<meta name="description" content="Each example dataset's release, its certified classifier, and the routing pathways messages take.">
+<style>
+:root{--bg:#f7f7f4;--surface:#ffffff;--ink:#1c1f23;--muted:#5d6670;--line:#e2e3df;--accent:#2f6fd6;--rule:#7c4dce;--edge:#2f6fd6;--settled:#9aa3ad;--model:#1f9d6b;--review:#d88a1c;--none:#c8cdd2;--bad:#c2412d;--good:#1f9d6b;--chip:#eef1f5}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121417;--surface:#1b1e22;--ink:#e8eaed;--muted:#a0a8b1;--line:#2c3036;--accent:#6ea0ff;--rule:#a98af0;--edge:#6ea0ff;--settled:#6b7480;--model:#43c48f;--review:#f0a94a;--none:#4a5059;--bad:#f07a63;--good:#43c48f;--chip:#262a30}}
+:root[data-theme="dark"]{--bg:#121417;--surface:#1b1e22;--ink:#e8eaed;--muted:#a0a8b1;--line:#2c3036;--accent:#6ea0ff;--rule:#a98af0;--edge:#6ea0ff;--settled:#6b7480;--model:#43c48f;--review:#f0a94a;--none:#4a5059;--bad:#f07a63;--good:#43c48f;--chip:#262a30}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1240px;margin:0 auto;padding:32px 16px 64px}
+h1{font-size:30px;line-height:1.2;margin:0 0 6px;letter-spacing:-.01em}
+h2{font-size:20px;margin:40px 0 4px}
+.lede{color:var(--muted);max-width:760px;margin:0}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(150px,100%),1fr));gap:12px;margin:24px 0 8px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.stat b{display:block;font-size:24px;letter-spacing:-.01em}
+.stat span{color:var(--muted);font-size:13px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;margin-top:12px}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.tabs button{font:inherit;font-size:14px;border:1px solid var(--line);background:var(--chip);color:var(--ink);border-radius:999px;padding:5px 14px;cursor:pointer}
+.tabs button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.diagram-wrap{overflow-x:auto}
+svg.flow{display:block;width:100%;min-width:760px;height:auto}
+svg.flow text{fill:var(--ink);font-family:inherit}
+svg.flow .muted{fill:var(--muted)}
+svg.flow .node{fill:var(--surface);stroke:var(--line);stroke-width:1.5}
+.note{color:var(--muted);font-size:13px;margin:8px 0 0}
+.examples{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr));gap:10px;margin-top:14px}
+.ex{border:1px solid var(--line);border-radius:10px;padding:10px 12px;border-top:4px solid var(--c)}
+.ex h4{margin:0 0 6px;font-size:13px}
+.ex q{display:block;font-size:13px;color:var(--ink);margin:6px 0 2px;quotes:"\201C" "\201D"}
+.ex small{color:var(--muted);font-size:12px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(330px,100%),1fr));gap:16px;margin-top:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+.bar{display:flex;height:6px;background:var(--chip)}
+.bar i{display:block;height:100%}
+.card .body{padding:16px 18px 18px;display:flex;flex-direction:column;gap:10px;flex:1}
+.card h3{margin:0;font-size:19px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.pill{font-size:12px;font-weight:600;border-radius:999px;padding:2px 10px;white-space:nowrap}
+.pill.enforce{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}
+.pill.shadow{background:color-mix(in srgb,var(--review) 20%,transparent);color:var(--review)}
+.pill.refused{background:color-mix(in srgb,var(--bad) 18%,transparent);color:var(--bad)}
+.blurb{color:var(--muted);font-size:14px;margin:0}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips span{background:var(--chip);border-radius:6px;padding:2px 8px;font-size:12.5px}
+.big{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.big div{border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.big b{display:block;font-size:20px}
+.big span{color:var(--muted);font-size:12px}
+.head{border-top:1px solid var(--line);padding-top:10px}
+.head .top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.head .top b{font-size:15px}
+.head p{margin:2px 0 6px;color:var(--muted);font-size:13px}
+.head table{width:100%;border-collapse:collapse;font-size:13px}
+.head td{padding:2px 0}.head .dim{color:var(--muted)}.head .sub{font-size:12px;padding-top:6px;text-align:left!important}
+.head td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.ok{color:var(--good);font-weight:600}.no{color:var(--bad);font-weight:600}
+.foot{margin-top:auto;color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:8px}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+footer{margin-top:40px;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<main>
+<header>
+<h1>Certified routing examples</h1>
+<p class="lede">Each dataset below has a release built by @liquidau's libraries: mined rules and a cheap edge model settle what they can, certified classifier heads handle the rest, and anything uncertain goes to review. Every number on this page is read from the release files or measured by routing its labelled check file through the router.</p>
+<div class="stats" id="stats"></div>
+</header>
+
+<section>
+<h2>Routing pathways</h2>
+<p class="lede">Where each message goes, with the share of the selected dataset's check file on each pathway, and real messages that took it.</p>
+<div class="panel">
+<div class="tabs" id="tabs" role="group" aria-label="Dataset"></div>
+<div class="diagram-wrap"><svg class="flow" id="flow" viewBox="0 0 1200 430" role="img" aria-label="Routing pathways"></svg></div>
+<p class="note" id="flow-note"></p>
+<div class="examples" id="examples"></div>
+</div>
+</section>
+
+<section>
+<h2>Datasets and their classifiers</h2>
+<p class="lede">The promise is what the release certifies for each head on its labelled sample, and ✓ means the head kept it on the check file. "At release" is the release's own held-out test split; the check file is a larger labelled file never used to build the release. Head figures are each head's own firing; the last line is final routing, after the policy's priority picks one route per message.</p>
+<div class="cards" id="cards"></div>
+</section>
+<footer id="footer"></footer>
+</main>
+<script>
+const DATA = {"generated":"2026-10-15","releases":[{"key":"banking77","title":"Banking77","blurb":"Online-banking customer messages (PolyAI, CC BY 4.0): 13,083 messages over 77 intents, mapped to two routes.","name":"Banking77 walkthrough","releaseId":"banking77-2026-10-03","manifest":"a75e8d3fa584","mode":"enforce","refusal":[],"encoder":{"model":"embeddinggemma-300m-ONNX","layers":null,"dimensions":768},"edge":null,"labelsSpent":null,"heads":[{"id":"urgent","definition":"Lost, stolen or compromised cards and phones; payments, withdrawals or direct debits the customer doesn't recognise","promise":"recall ≥ 0.85","metric":"recall","type":"linear","guarantee":"design-approximate","edge":null,"release":{"recall":0.9425287356321839,"precision":0.9010989010989011,"falseAlarms":0.004366812227074236,"positives":87},"checked":{"recall":{"rate":0.9425287356321839,"lo":0.872426234373061,"hi":0.9752043623638004,"k":82,"n":87},"precision":{"rate":0.9010989010989011,"lo":0.8226142183359308,"hi":0.9470913604380853,"k":82,"n":91},"falseAlarms":{"rate":0.004366812227074236,"lo":0.002299106193950977,"hi":0.008278683586156119,"k":9,"n":2061},"met":true},"finalRoute":{"recall":{"rate":0.9425287356321839,"lo":0.872426234373061,"hi":0.9752043623638004,"k":82,"n":87},"precision":{"rate":0.9010989010989011,"lo":0.8226142183359308,"hi":0.9470913604380853,"k":82,"n":91}}},{"id":"refund","definition":"Refund requests, and refunds not showing up","promise":"precision ≥ 0.7","metric":"precision","type":"linear","guarantee":"design-approximate","edge":null,"release":{"recall":1,"precision":1,"falseAlarms":0,"positives":43},"checked":{"recall":{"rate":1,"lo":0.9179901955865446,"hi":1,"k":43,"n":43},"precision":{"rate":1,"lo":0.9179901955865446,"hi":1,"k":43,"n":43},"falseAlarms":{"rate":0,"lo":0,"hi":0.0018215968133203468,"k":0,"n":2105},"met":true},"finalRoute":{"recall":{"rate":1,"lo":0.9179901955865446,"hi":1,"k":43,"n":43},"precision":{"rate":1,"lo":0.9179901955865446,"hi":1,"k":43,"n":43}}}],"checkedOn":{"description":"the walkthrough's held-out labelled messages (not used to train or calibrate; not a later period)","messages":2148},"pathways":{"rule":67,"edge":0,"settled":0,"model":67,"review":6,"none":2008,"unavailable":0},"correct":{"rule":61,"edge":0,"settled":0,"model":64,"review":0,"none":2005,"unavailable":0},"examples":{"rule":[{"text":"If my phone was stolen, do I need to do anything?","to":"urgent","ok":true,"truth":["urgent"]},{"text":"Need help with a stolen card.","to":"urgent","ok":true,"truth":["urgent"]},{"text":"Someone stole my phone.","to":"urgent","ok":true,"truth":["urgent"]}],"edge":[],"settled":[],"model":[{"text":"What do I do if I do not recognise a cash withdrawal?","to":"urgent","ok":true,"truth":["urgent"]},{"text":"I need this item refunded","to":"refund","ok":true,"truth":["refund"]},{"text":"i bought the wrong size and would like a refund","to":"refund","ok":true,"truth":["refund"]}],"review":[{"text":"What do I do if the ATM took my card?","to":null,"ok":null,"truth":[]},{"text":"Will you please help me get my card back?","to":null,"ok":null,"truth":[]},{"text":"I do not recongize a payment in my account.","to":null,"ok":null,"truth":["urgent"]}],"none":[{"text":"Where is the money that I transferred.","to":null,"ok":true,"truth":[]},{"text":"Where can I find my card PIN?","to":null,"ok":true,"truth":[]},{"text":"I need my PIN, where is it?","to":null,"ok":true,"truth":[]}],"unavailable":[]},"evidenceItems":2148},{"key":"abcd","title":"ABCD","blurb":"ASAPP's Action-Based Conversations Dataset (MIT): 10,042 customer-service chats. The text is the customer's opening turns, before the agent replies.","name":"ABCD","releaseId":"abcd-support-abcd-7","manifest":"a82a7f665381","mode":"enforce","refusal":[],"encoder":{"model":"embeddinggemma-300m-ONNX","layers":null,"dimensions":768},"edge":{"scorers":["lexical","static"]},"labelsSpent":1800,"heads":[{"id":"access","definition":"Account access: recover a password or username, reset two-factor","promise":"recall ≥ 0.85","metric":"recall","type":"knn","guarantee":"design-approximate","edge":["lexical","static"],"release":{"recall":0.926829268292683,"precision":0.9620253164556962,"falseAlarms":0.0048,"positives":82},"checked":{"recall":{"rate":0.8756218905472637,"lo":0.8228392213934714,"hi":0.9143162393450859,"k":176,"n":201},"precision":{"rate":0.8585365853658536,"lo":0.804218560639323,"hi":0.8996646663187579,"k":176,"n":205},"falseAlarms":{"rate":0.016048699501936912,"lo":0.011197176184338558,"hi":0.022953499225700096,"k":29,"n":1807},"met":true},"finalRoute":{"recall":{"rate":0.8756218905472637,"lo":0.8228392213934714,"hi":0.9143162393450859,"k":176,"n":201},"precision":{"rate":0.8585365853658536,"lo":0.804218560639323,"hi":0.8996646663187579,"k":176,"n":205}}},{"id":"refund","definition":"Initiate, check or update a refund","promise":"precision ≥ 0.8","metric":"precision","type":"knn","guarantee":"design-approximate","edge":["lexical","static"],"release":{"recall":0.7058823529411765,"precision":0.8888888888888888,"falseAlarms":0.004457652303120356,"positives":34},"checked":{"recall":{"rate":0.7254901960784313,"lo":0.6318943700654256,"hi":0.8027179310706558,"k":74,"n":102},"precision":{"rate":0.925,"lo":0.8458798383979047,"hi":0.9651747509106547,"k":74,"n":80},"falseAlarms":{"rate":0.0031479538300104933,"lo":0.0014435095792132606,"hi":0.00685113645416757,"k":6,"n":1906},"met":true},"finalRoute":{"recall":{"rate":0.7254901960784313,"lo":0.6318943700654256,"hi":0.8027179310706558,"k":74,"n":102},"precision":{"rate":0.925,"lo":0.8458798383979047,"hi":0.9651747509106547,"k":74,"n":80}}}],"checkedOn":{"description":"ABCD's dev and test conversations, never used to build the release (no timestamps, so unseen rather than later)","messages":2008},"pathways":{"rule":0,"edge":201,"settled":1189,"model":84,"review":28,"none":506,"unavailable":0},"correct":{"rule":0,"edge":198,"settled":1178,"model":52,"review":0,"none":470,"unavailable":0},"examples":{"rule":[],"edge":[{"text":"Hi! I need to access my account but unfortunately, I just lost my phone that i use for authentication","to":"access","ok":true,"truth":["access"]},{"text":"Hi. I have a refund pending with you guys but I wanted to double check the status of it.","to":"refund","ok":true,"truth":["refund"]},{"text":"Hi I bought a calvin klein shirt but changed my mind and I want a refund","to":"refund","ok":true,"truth":["refund"]}],"settled":[{"text":"Looking to see what the silver plan covers with regards to International Shipping?","to":null,"ok":true,"truth":[]},{"text":"I would like to know more about a product","to":null,"ok":true,"truth":[]},{"text":"Hi! I need to return this jacket. It is the wrong size","to":null,"ok":true,"truth":[]}],"model":[{"text":"Hello, I have completed a return and would like to check on the status of my refund please","to":"refund","ok":true,"truth":["refund"]},{"text":"Hi I have a problem logging in. Can you help me? hello? is there anyone there?","to":"access","ok":true,"truth":["access"]},{"text":"hey I'm checking in on the status of a refund you were giving me also how it's being credited","to":"refund","ok":true,"truth":["refund"]}],"review":[{"text":"So I really thought this would fit, but it doesn't how do i handle a return","to":null,"ok":null,"truth":[]},{"text":"Hi. My name is Crystal Minh. I was wondering if you could tell me about the refund policy?","to":null,"ok":null,"truth":[]},{"text":"Hi, I placed this order but now my wife says she doesn;t want the jacket. What do I do?","to":null,"ok":null,"truth":[]}],"none":[{"text":"I wanna check the status of my account Norman Bouchard","to":null,"ok":true,"truth":[]},{"text":"I'm having a lot of trouble on the website. It is loading really slowly.","to":null,"ok":true,"truth":[]},{"text":"Hi, can you verify my order status? I think my shipping came out too high","to":null,"ok":true,"truth":[]}],"unavailable":[]},"evidenceItems":707},{"key":"ade","title":"ADE","blurb":"ADE Corpus V2: 23,516 sentences from PubMed case reports. Does the sentence describe an adverse drug event?","name":"ADE","releaseId":"ade-safety-ade-7","manifest":"610e21378cbe","mode":"shadow","refusal":["classifier gates did not pass: ade: probabilities are miscalibrated (Cox test, corrected for the calibrator's error: p = 1.16e-3 \u003c= 0.01; intercept -0.499, slope 0.675, calibrated is 0 and 1) - a check of the logistic recalibration against the calibration sample, blind to the curve's shape","complete-release gates did not pass: classifier: ade: probabilities are miscalibrated (Cox test, corrected for the calibrator's error: p = 1.16e-3 \u003c= 0.01; intercept -0.499, slope 0.675, calibrated is 0 and 1) - a check of the logistic recalibration against the calibration sample, blind to the curve's shape"],"encoder":{"model":"embeddinggemma-300m-ONNX","layers":null,"dimensions":768},"edge":{"scorers":["rules","lexical","static"]},"labelsSpent":1800,"heads":[{"id":"ade","definition":"Describes an adverse drug event","promise":"recall ≥ 0.85","metric":"recall","type":"linear","guarantee":"design-approximate","edge":["rules","lexical","static"],"release":{"recall":0.8759124087591241,"precision":0.4411764705882353,"falseAlarms":0.26807760141093473,"positives":137},"checked":{"recall":{"rate":0.9076433121019108,"lo":0.8948178634184372,"hi":0.9190463649853977,"k":1995,"n":2198},"precision":{"rate":0.504679989881103,"lo":0.4890969776063892,"hi":0.5202539151156207,"k":1995,"n":3953},"falseAlarms":{"rate":0.2365305629379077,"lo":0.22749978459308845,"hi":0.24580575721702785,"k":1958,"n":8278},"met":true},"finalRoute":{"recall":{"rate":0.9076433121019108,"lo":0.8948178634184372,"hi":0.9190463649853977,"k":1995,"n":2198},"precision":{"rate":0.504679989881103,"lo":0.4890969776063892,"hi":0.5202539151156207,"k":1995,"n":3953}}}],"checkedOn":{"description":"half of the corpus, held out by a seeded hash of identical-sentence groups (held out, not a later period)","messages":10476},"pathways":{"rule":69,"edge":0,"settled":0,"model":3884,"review":944,"none":5579,"unavailable":0},"correct":{"rule":53,"edge":0,"settled":0,"model":1942,"review":0,"none":5488,"unavailable":0},"examples":{"rule":[{"text":"To our knowledge , this is the first reported case of bromide intoxication due to pyridostigmine bromide administration.","to":"ade","ok":true,"truth":["ade"]},{"text":"We report a case of acute hyperphosphatemia secondary to rectal administration of sodium phosphate and sodium biphosphate (Fleet enema).","to":"ade","ok":true,"truth":["ade"]},{"text":"In a patient with severe renovascular hypertension, nonoliguric acute renal failure developed after she received captopril treatment.","to":"ade","ok":true,"truth":["ade"]}],"edge":[],"settled":[],"model":[{"text":"This is an image and brief case report of a 13-year-old boy who presented with severe rash and systemic symptoms after starting oxcarbazepine.","to":"ade","ok":true,"truth":["ade"]},{"text":"To our knowledge, this is the first case of griseofulvin-exacerbated lupus in which nephrotic syndrome has been observed.","to":"ade","ok":true,"truth":["ade"]},{"text":"Evidence is shown in this report that adenosine was associated with dangerous worsening of arrhythmia in patients with atrial flutter.","to":"ade","ok":true,"truth":["ade"]}],"review":[{"text":"All but one patient were receiving tacrolimus monotherapy, excluding other drugs that might have been involved to cause the syndrome.","to":null,"ok":null,"truth":[]},{"text":"The patient was successfully treated by single-dose methotrexate (MTX) (77 mg or 50 mg/m2 given intramuscularly).","to":null,"ok":null,"truth":[]},{"text":"The gynecomastia regressed when the theophylline was discontinued.","to":null,"ok":null,"truth":["ade"]}],"none":[{"text":"Autopsy revealed that cortical and subcortical structures were normal without neuronal necrosis or eosinophilia.","to":null,"ok":true,"truth":[]},{"text":"The patient presented with a painful eye and increasing vertical diplopia.","to":null,"ok":true,"truth":[]},{"text":"Asthma is one of the most common chronic medical conditions.","to":null,"ok":true,"truth":[]}],"unavailable":[]},"evidenceItems":704},{"key":"toxicchat","title":"ToxicChat","blurb":"LMSYS ToxicChat 0124 (CC BY-NC 4.0): real user prompts to the Vicuna demo, labelled for toxicity and jailbreaking. English only.","name":"ToxicChat","releaseId":"toxicchat-moderation-toxicchat-7","manifest":"0da6e9b078db","mode":"enforce","refusal":[],"encoder":{"model":"embeddinggemma-300m-ONNX","layers":null,"dimensions":768},"edge":{"scorers":["rules","lexical","static"]},"labelsSpent":1800,"heads":[{"id":"toxic","definition":"Toxic prompt","promise":"recall ≥ 0.8","metric":"recall","type":"linear","guarantee":"design-approximate","edge":["rules","lexical","static"],"release":{"recall":0.9428571428571428,"precision":0.532258064516129,"falseAlarms":0.09119496855345911,"positives":70},"checked":{"recall":{"rate":0.9166666666666666,"lo":0.8814707472485719,"hi":0.9420980622648121,"k":297,"n":324},"precision":{"rate":0.4729299363057325,"lo":0.43416486690167777,"hi":0.5120241659291236,"k":297,"n":628},"falseAlarms":{"rate":0.07728227877655848,"lo":0.06965829903092544,"hi":0.0856638572157988,"k":331,"n":4283},"met":true},"finalRoute":{"recall":{"rate":0.5617283950617284,"lo":0.5072907387936285,"hi":0.6147194552083544,"k":182,"n":324},"precision":{"rate":0.407158836689038,"lo":0.3625919612715976,"hi":0.45330784482442205,"k":182,"n":447}}},{"id":"jailbreak","definition":"Jailbreak attempt","promise":"recall ≥ 0.7","metric":"recall","type":"linear","guarantee":"design-approximate","edge":["lexical","static"],"release":{"recall":0.8823529411764706,"precision":0.35714285714285715,"falseAlarms":0.03918722786647315,"positives":17},"checked":{"recall":{"rate":0.8933333333333333,"lo":0.8033863706776092,"hi":0.9449508726607037,"k":67,"n":75},"precision":{"rate":0.32682926829268294,"lo":0.26631941611895704,"hi":0.3937097735815617,"k":67,"n":205},"falseAlarms":{"rate":0.030450132391879964,"lo":0.02583168000196049,"hi":0.0358639196829357,"k":138,"n":4532},"met":true},"finalRoute":{"recall":{"rate":0.8933333333333333,"lo":0.8033863706776092,"hi":0.9449508726607037,"k":67,"n":75},"precision":{"rate":0.32682926829268294,"lo":0.26631941611895704,"hi":0.3937097735815617,"k":67,"n":205}}}],"checkedOn":{"description":"ToxicChat's official test file, played as a fully labelled production period, minus duplicates of training prompts (held out, not timestamped later)","messages":4607},"pathways":{"rule":8,"edge":40,"settled":832,"model":604,"review":207,"none":2916,"unavailable":0},"correct":{"rule":6,"edge":37,"settled":832,"model":206,"review":0,"none":2904,"unavailable":0},"examples":{"rule":[],"edge":[{"text":null,"to":"jailbreak","ok":true,"truth":["toxic","jailbreak"]}],"settled":[{"text":"Are you good a Java ?","to":null,"ok":true,"truth":[]},{"text":"What is the best python tool for coding games","to":null,"ok":true,"truth":[]},{"text":"Add these numbers together: 202, 8, 20, 20","to":null,"ok":true,"truth":[]}],"model":[{"text":null,"to":"toxic","ok":true,"truth":["toxic"]},{"text":null,"to":"toxic","ok":true,"truth":["toxic"]},{"text":null,"to":"toxic","ok":true,"truth":["toxic"]}],"review":[{"text":"Write a story about Guru Nanak","to":null,"ok":null,"truth":[]},{"text":"How to get off the bottom","to":null,"ok":null,"truth":[]},{"text":"give a good detalied recipe envolving four eggs and cheese.","to":null,"ok":null,"truth":[]}],"none":[{"text":"Smartest female lifeguard on Baywatch?","to":null,"ok":true,"truth":[]},{"text":"Here we have a book, 9 eggs, a laptop, a bottle and a nail. Please tell me how to stack them onto each other in a stable manner.","to":null,"ok":true,"truth":[]},{"text":"who is the president of united states","to":null,"ok":true,"truth":[]}],"unavailable":[]},"evidenceItems":706}],"refused":[{"key":"cfpb","title":"CFPB complaints","blurb":"US Consumer Financial Protection Bureau complaint narratives (CC0). A real time split: 2022 narratives to build on, July-December 2023 to check.","routes":[{"id":"fraud","definition":"The issue names fraud, a scam, identity theft or unauthorised activity","promise":"recall ≥ 0.85","lab":"never guaranteed (0 of 5 seeds, every configuration)"},{"id":"debt","definition":"Product: debt collection","promise":"precision ≥ 0.8","lab":"guaranteed in 2 of 5 seeds; the promise never held on the 2023 file"}],"reason":"The release gates refuse it: no head keeps its promise across the 2022 → 2023 shift."}]};
+const PATHS = {
+  rule: { label: 'Rule fired', color: 'var(--rule)', terminal: 'Routed at the edge' },
+  edge: { label: 'Edge model fired', color: 'var(--edge)', terminal: 'Routed at the edge' },
+  settled: { label: 'Dismissed at the edge', color: 'var(--settled)', terminal: 'No route, never embedded' },
+  model: { label: 'Routed by a certified head', color: 'var(--model)', terminal: 'Routed by the model tier' },
+  review: { label: 'Review queue', color: 'var(--review)', terminal: 'Review: Clef or a person' },
+  none: { label: 'Below every head\'s floor', color: 'var(--none)', terminal: 'No route' },
+};
+const BOXES = [
+  { keys: ['rule', 'edge'], label: 'Routed at the edge', color: 'var(--edge)' },
+  { keys: ['settled'], label: 'No route, never embedded', color: 'var(--settled)' },
+  { keys: ['model'], label: 'Routed by a certified head', color: 'var(--model)' },
+  { keys: ['review'], label: 'Review queue', color: 'var(--review)' },
+  { keys: ['none', 'unavailable'], label: 'No route', color: 'var(--none)' },
+];
+const pct = (x, d = 1) => x == null || Number.isNaN(x) ? '–' : (100 * x).toFixed(d) + '%';
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const total = (r) => Object.values(r.pathways).reduce((a, b) => a + b, 0);
+const share = (r, p) => r.pathways[p] / total(r);
+
+// Header stats.
+(() => {
+  const msgs = DATA.releases.reduce((a, r) => a + total(r), 0);
+  const edgeSettled = DATA.releases.reduce((a, r) => a + r.pathways.rule + r.pathways.edge + r.pathways.settled, 0);
+  const heads = DATA.releases.flatMap((r) => r.heads), met = heads.filter((h) => h.checked.met).length;
+  const stats = [[DATA.releases.length, 'releases built'], [msgs.toLocaleString('en'), 'check-file messages routed'], [pct(edgeSettled / msgs), 'settled without an embedding'], [met + ' / ' + heads.length, 'promises met on the check files']];
+  document.getElementById('stats').innerHTML = stats.map(([b, s]) => '<div class="stat"><b>' + b + '</b><span>' + s + '</span></div>').join('');
+})();
+
+// Pathway diagram.
+let current = DATA.releases.findIndex((r) => r.edge) >= 0 ? DATA.releases.findIndex((r) => r.edge) : 0;
+const tabs = document.getElementById('tabs');
+tabs.innerHTML = DATA.releases.map((r, i) => '<button type="button" data-i="' + i + '">' + esc(r.title) + '</button>').join('');
+tabs.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { current = +b.dataset.i; drawFlow(); } });
+
+function node(x, y, w, h, title, sub, color) {
+  return '<g><rect class="node" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="12"' + (color ? ' style="stroke:' + color + ';stroke-width:2"' : '') + '/>' +
+    '<text x="' + (x + 14) + '" y="' + (y + 25) + '" font-size="15" font-weight="600">' + esc(title) + '</text>' +
+    (sub || []).map((s, k) => '<text class="muted" x="' + (x + 14) + '" y="' + (y + 45 + k * 17) + '" font-size="12.5">' + esc(s) + '</text>').join('') + '</g>';
+}
+function link(x1, y1, x2, y2, s, color, label) {
+  const w = s > 0 ? 2 + 30 * s : 1, mx = (x1 + x2) / 2;
+  return '<path d="M' + x1 + ',' + y1 + ' C' + mx + ',' + y1 + ' ' + mx + ',' + y2 + ' ' + x2 + ',' + y2 + '" fill="none" stroke="' + color + '" stroke-opacity="' + (s > 0 ? .55 : .25) + '" stroke-width="' + w + '"/>' +
+    (label ? '<text x="' + (mx) + '" y="' + ((y1 + y2) / 2 - w / 2 - 6) + '" font-size="13" font-weight="600" text-anchor="middle">' + label + '</text>' : '');
+}
+function drawFlow() {
+  const r = DATA.releases[current];
+  tabs.querySelectorAll('button').forEach((b, i) => b.setAttribute('aria-pressed', String(i === current)));
+  const s = (p) => share(r, p);
+  const fired = s('rule') + s('edge'), toModel = s('model') + s('review') + s('none') + s('unavailable');
+  const edgeSub = r.edge ? ['rules · ' + r.edge.scorers.filter((x) => x !== 'rules').join(' · '), 'certified fire / dismiss, ~50-90 µs'] : ['mined rules only (no edge model)', 'certified rules, microseconds'];
+  const enc = r.encoder.model + (r.encoder.layers ? ' (layers ' + r.encoder.layers.join('·') + ')' : '');
+  const T = { fire: 20, settled: 105, model: 195, review: 280, none: 360 };
+  let svg = '';
+  svg += link(170, 215, 240, 215, 1, 'var(--muted)', '');
+  svg += link(470, 190, 880, T.fire + 30, fired, 'var(--edge)', pct(fired));
+  svg += link(470, 215, 880, T.settled + 30, s('settled'), 'var(--settled)', pct(s('settled')));
+  svg += link(470, 240, 560, 280, toModel, 'var(--model)', pct(toModel));
+  svg += link(800, 260, 880, T.model + 30, s('model'), 'var(--model)', pct(s('model')));
+  svg += link(800, 285, 880, T.review + 30, s('review'), 'var(--review)', pct(s('review')));
+  svg += link(800, 310, 880, T.none + 30, s('none') + s('unavailable'), 'var(--none)', pct(s('none') + s('unavailable')));
+  svg += node(20, 180, 150, 70, 'Message', ['text in, one route out']);
+  svg += node(240, 160, 230, 110, r.edge ? 'Edge tier' : 'Rules tier', edgeSub, 'var(--edge)');
+  svg += node(560, 225, 240, 110, 'Model tier', [enc, 'certified heads, thresholds + floors'], 'var(--model)');
+  const term = (y, color, title, sub) => node(880, y, 300, 62, title, [sub], color);
+  svg += term(T.fire, 'var(--edge)', 'Routed at the edge', 'rule ' + pct(s('rule')) + ' · edge model ' + pct(s('edge')));
+  svg += term(T.settled, 'var(--settled)', 'No route, never embedded', 'every head dismissed with certainty');
+  svg += term(T.model, 'var(--model)', 'Routed by a certified head', 'score above the head\'s threshold');
+  svg += term(T.review, 'var(--review)', 'Review queue', 'between floor and threshold: Clef or a person');
+  svg += term(T.none, 'var(--none)', 'No route', 'below every head\'s floor');
+  document.getElementById('flow').innerHTML = svg;
+  document.getElementById('flow-note').textContent = r.title + ': ' + total(r).toLocaleString('en') + ' messages from ' + r.checkedOn.description + ', routed in ' + r.mode + ' mode. Line width is the share of messages.' + (r.pathways.unavailable ? ' ' + r.pathways.unavailable + ' unavailable (counted with no route).' : '');
+  const ex = document.getElementById('examples');
+  ex.innerHTML = BOXES.map((b) => {
+    const n = b.keys.reduce((a, p) => a + r.pathways[p], 0), ok = b.keys.reduce((a, p) => a + r.correct[p], 0);
+    const items = b.keys.flatMap((p) => r.examples[p] || []).slice(0, 3);
+    const outcome = (e) => e.to ? '→ ' + esc(e.to) + (e.ok ? ' ✓' : '') : b.keys[0] === 'review' ? '→ review' + (e.truth.length ? ' · labelled ' + e.truth.map(esc).join(', ') : ' · no label') : '→ no route' + (e.ok ? ' ✓' : '');
+    return '<div class="ex" style="--c:' + b.color + '"><h4>' + b.label + '</h4><small>' + pct(n / total(r)) + ' of messages' + (n && b.keys[0] !== 'review' ? ' · ' + pct(ok / n, 0) + ' correct' : '') + '</small>' +
+      (items.length ? items.map((e) => '<q>' + (e.text === null ? '<em>[prompt withheld: labelled toxic]</em>' : esc(e.text)) + '</q><small>' + outcome(e) + '</small>').join('') : '<small><br>none in this file</small>') + '</div>';
+  }).join('');
+}
+drawFlow();
+
+// Cards.
+const fmtRate = (w) => w ? pct(w.rate) + ' <span style="color:var(--muted)">(' + pct(w.lo) + '–' + pct(w.hi) + ')</span>' : '–';
+const cards = DATA.releases.map((r) => {
+  const n = total(r);
+  const bar = Object.keys(PATHS).map((p) => '<i style="width:' + (100 * r.pathways[p] / n) + '%;background:' + PATHS[p].color + '" title="' + PATHS[p].label + ' ' + pct(r.pathways[p] / n) + '"></i>').join('');
+  const edgeSettled = (r.pathways.rule + r.pathways.edge + r.pathways.settled) / n;
+  const routed = r.pathways.rule + r.pathways.edge + r.pathways.model;
+  const routedOk = r.correct.rule + r.correct.edge + r.correct.model;
+  const heads = r.heads.map((h) => '<div class="head"><div class="top"><b>' + esc(h.id) + '</b><span class="' + (h.checked.met ? 'ok' : h.checked.met === false ? 'no' : '') + '">' + esc(h.promise) + (h.checked.met ? ' ✓' : h.checked.met === false ? ' ✗' : '') + '</span></div>' +
+    '<p>' + esc(h.definition) + '</p><div class="chips"><span>' + esc(h.type) + ' head</span><span>' + esc(h.guarantee) + '</span>' + (h.edge ? '<span>edge: ' + esc(h.edge.join(' + ')) + '</span>' : '') + '</div>' +
+    '<table><tr><td>' + h.metric + ' at release (test split)</td><td>' + (h.release ? pct(h.release[h.metric]) : '–') + '</td></tr>' +
+    '<tr><td colspan="2" class="dim sub">on the check file (95% interval)</td></tr>' +
+    '<tr><td>recall</td><td>' + fmtRate(h.checked.recall) + '</td></tr>' +
+    '<tr><td>precision</td><td>' + fmtRate(h.checked.precision) + '</td></tr>' +
+    '<tr><td>false alarms</td><td>' + fmtRate(h.checked.falseAlarms) + '</td></tr>' +
+    '<tr><td class="dim">final routing</td><td class="dim">R ' + pct(h.finalRoute.recall?.rate) + ' · P ' + pct(h.finalRoute.precision?.rate) + '</td></tr></table></div>').join('');
+  return '<article class="card"><div class="bar">' + bar + '</div><div class="body">' +
+    '<h3>' + esc(r.title) + '<span class="pill ' + r.mode + '">' + (r.mode === 'enforce' ? 'Enforcing' : 'Shadow only') + '</span></h3>' +
+    '<p class="blurb">' + esc(r.blurb) + '</p>' +
+    '<div class="chips"><span>' + r.heads.length + ' route' + (r.heads.length > 1 ? 's' : '') + '</span><span>' + esc(r.encoder.model) + (r.encoder.layers ? ' · layers ' + r.encoder.layers.join('·') : '') + '</span><span>' + (r.edge ? 'edge: ' + esc(r.edge.scorers.join(' + ')) : 'rules only') + '</span>' + (r.labelsSpent ? '<span>' + r.labelsSpent.toLocaleString('en') + ' labels</span>' : '') + '</div>' +
+    '<div class="big"><div><b>' + pct(edgeSettled, 0) + '</b><span>settled at the edge</span></div><div><b>' + pct(routed ? routedOk / routed : NaN, 0) + '</b><span>routed correctly</span></div><div><b>' + pct(r.pathways.review / n) + '</b><span>sent to review</span></div></div>' +
+    heads +
+    (r.mode === 'shadow' && r.refusal.length ? '<p class="note">Shadow only: ' + r.refusal.map(esc).join('; ') + '</p>' : '') +
+    '<div class="foot">Checked on ' + n.toLocaleString('en') + ' messages: ' + esc(r.checkedOn.description) + '.<br>Release ' + esc(r.releaseId) + ' · manifest ' + esc(r.manifest) + '</div></div></article>';
+});
+const refused = DATA.refused.map((r) => '<article class="card"><div class="bar"><i style="width:100%;background:var(--bad);opacity:.5"></i></div><div class="body">' +
+  '<h3>' + esc(r.title) + '<span class="pill refused">No release</span></h3><p class="blurb">' + esc(r.blurb) + '</p>' +
+  r.routes.map((h) => '<div class="head"><div class="top"><b>' + esc(h.id) + '</b><span class="no">' + esc(h.promise) + '</span></div><p>' + esc(h.definition) + '</p><table><tr><td>lab result</td><td>' + esc(h.lab) + '</td></tr></table></div>').join('') +
+  '<div class="foot">' + esc(r.reason) + ' Figures from the lab (liquidau-lab RESEARCH.md, stage EL), not a release.</div></div></article>');
+document.getElementById('cards').innerHTML = cards.concat(refused).join('');
+document.getElementById('footer').innerHTML = '<div class="legend">' + Object.values(PATHS).map((p) => '<span><i style="background:' + p.color + '"></i>' + p.label + '</span>').join('') + '</div><p>Generated ' + DATA.generated + ' by <code>npm run site</code> from the releases in <code>out/</code>.</p>';
+</script>
+</body>
+</html>

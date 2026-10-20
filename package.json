@@ -16,14 +16,20 @@
     "toxicchat:embed": "node --import tsx src/toxicchat-embed.ts",
     "teacher:toxicchat": "node --import tsx src/teacher/toxicchat-clef.ts",
     "serve:check": "node --import tsx src/serve-check.ts",
+    "split:check": "node --import tsx src/split-check.ts",
+    "serve:bench": "node --import tsx src/serve-bench.ts",
+    "ops:check": "node --import tsx src/ops-check.ts",
     "release:simulate": "node --import tsx src/release-simulate.ts",
+    "site": "node --import tsx src/site.ts",
     "export:onnx": "python3 scripts/export_layers_onnx.py .cache/onnx"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.0",
-    "@liquidau/embedding-classifier": "0.6.2",
-    "@liquidau/rule-miner": "0.5.0",
+    "@liquidau/embedding-classifier": "0.8.1",
+    "@liquidau/router": "0.2.2",
+    "@liquidau/rule-miner": "0.5.2",
     "@liquidau/solvers": "0.6.2",
+    "@liquidau/text-preprocessing": "0.1.0",
     "eld": "^2.1.0",
     "stemmer": "^2.0.1"
   },

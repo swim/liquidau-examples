@@ -17,7 +17,11 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-export type ClefModel = 'clef' | 'clef-flash';
+/**
+ * 'jev' is TypeSafe's Jev (a third-party model on Workers AI, `typesafe/jev`): the same state-and-questions
+ * schema, called through the generic /ai/run endpoint and billed from the AI Gateway balance (or BYOK).
+ */
+export type ClefModel = 'clef' | 'clef-flash' | 'jev';
 export interface NoulQuestion { type: 'noul'; instructions: string }
 export type Questions = Record<string, NoulQuestion>;
 
@@ -73,7 +77,8 @@ export class ClefTeacher {
   /** Probability of yes per question for each text (cached; only uncached texts are sent). */
   async label(texts: string[]): Promise<Array<Record<string, number>>> {
     const { account, token } = credentials();
-    const url = `https://api.cloudflare.com/client/v4/accounts/${account}/ai/run/@cf/cloudflare/${this.o.model}`;
+    const jev = this.o.model === 'jev';
+    const url = jev ? `https://api.cloudflare.com/client/v4/accounts/${account}/ai/run` : `https://api.cloudflare.com/client/v4/accounts/${account}/ai/run/@cf/cloudflare/${this.o.model}`;
     const missing = [...new Set(texts.filter((t) => !(this.key(t) in this.cache)))];
     const log = this.o.log ?? (() => {});
     log(`Clef ${this.o.model}: ${missing.length} new of ${texts.length} texts (${texts.length - missing.length} cached)`);
@@ -83,11 +88,15 @@ export class ClefTeacher {
       while (next < missing.length) {
         if (this.spent >= budget) throw new Error(`token budget of ${budget} reached after ${done} texts; rerun to continue (cached answers are kept)`);
         const text = missing[next++];
-        const body = JSON.stringify({ model: this.o.model, state: this.truncate(text), questions: this.o.questions });
+        const body = JSON.stringify(jev ? { model: 'typesafe/jev', input: { state: this.truncate(text), questions: this.o.questions } } : { model: this.o.model, state: this.truncate(text), questions: this.o.questions });
         for (let attempt = 0; ; attempt++) {
           const res = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body });
           if (res.ok) {
-            const json = await res.json() as { result?: { answers?: Record<string, unknown>; usage?: { input_tokens?: number } } };
+            type Output = { answers?: Record<string, unknown>; usage?: { input_tokens?: number } };
+            const raw = await res.json() as { result?: Output & { state?: string; result?: Output } };
+            // Jev (third-party, generic /ai/run) nests its output one level down, under a completion state.
+            if (jev && raw.result?.state !== undefined && raw.result.state !== 'Completed') throw new Error(`jev: request state ${raw.result.state}`);
+            const json = { result: jev && raw.result?.result ? raw.result.result : raw.result };
             const answers = json.result?.answers ?? {};
             const out: Record<string, number> = {};
             for (const q of Object.keys(this.o.questions)) {
@@ -103,8 +112,8 @@ export class ClefTeacher {
             this.spent += json.result?.usage?.input_tokens ?? 0;
             break;
           }
-          if ((res.status === 429 || res.status >= 500) && attempt < 6) { await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt)); continue; }
-          throw new Error(`Clef HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+          if ((res.status === 429 || res.status >= 500) && attempt < (jev ? 12 : 6)) { await new Promise((r) => setTimeout(r, Math.min(60_000, 1000 * 2 ** attempt))); continue; }
+          throw new Error(`${this.o.model} HTTP ${res.status}: ${(await res.text()).slice(0, 300)}${res.status === 402 && jev ? ' (Jev is billed from the AI Gateway balance: add credit, or use BYOK)' : ''}`);
         }
         if (++done % 200 === 0) { this.save(); log(`  labelled ${done}/${missing.length} (${this.spent.toLocaleString()} input tokens this run)`); }
       }

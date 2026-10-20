@@ -46,6 +46,30 @@ export interface SampleOptions {
   stratify?: { name: string; fit: (hist: readonly Labelled[]) => (m: Labelled) => number };
   /** Optional, with a proportional sample: strata in the top score band at this multiple of their share (same total). Only with an independent score (e.g. an offline teacher's). */
   topFactor?: number;
+  /** Research: the main sample's train / calibration / test shares (default 0.2 / 0.4 / 0.4). */
+  roleSplit?: { train: number; calibration: number; test: number };
+  /** Research: Neyman allocation of the main sample, each stratum's rate the mean stratifying score over its frame items (fixed before drawing). */
+  neyman?: boolean;
+}
+
+/**
+ * The main sample with Neyman allocation (n_h ∝ N_h·√(p_h(1 − p_h))) on the same strata as a
+ * proportional design, p_h the mean stratifying score of the stratum's frame items: decided from the
+ * frame alone, before any label is drawn.
+ */
+export function neymanSample(options: Omit<Parameters<typeof designSample>[0], 'allocation' | 'seed'>, total: number, seed: number) {
+  const { stratumOf } = designSample({ ...options, allocation: { total, method: 'proportional' }, seed });
+  const sum = new Map<string, { s: number; n: number }>();
+  for (const f of options.frame) {
+    // stratumOf names `<designId>/<stratum>`; the prior is keyed by the bare stratum name.
+    const st = stratumOf[f.id]?.slice(stratumOf[f.id].indexOf('/') + 1);
+    if (st === undefined) continue;
+    const a = sum.get(st) ?? { s: 0, n: 0 };
+    a.s += f.signals.score ?? 0; a.n++;
+    sum.set(st, a);
+  }
+  const prior = Object.fromEntries([...sum].map(([st, a]) => [st, Math.min(0.995, Math.max(0.005, a.s / a.n))]));
+  return designSample({ ...options, allocation: { total, method: 'neyman', prior }, seed });
 }
 
 /**
@@ -109,7 +133,7 @@ export async function buildRound(seed: number, ctx: Context, sampleOptions: Samp
   const stratScore = sampleOptions.stratify?.fit(hist) ?? ((m: Message) => round0Score(m));
   const frame: FrameItem[] = scenario.frame.map((m) => ({ id: m.id, text: m.text, group: m.group, signals: { ruleFires: candidateMatcher.match(m.text) !== null, score: stratScore(m), slice: lengthBucket(m.text) } }));
   // Training data comes mostly from the historical set, so the sample favours calibration and test.
-  const designOptions = { frame, scoreBands: [0.9, 0.7], scoringModel: sampleOptions.stratify?.name ?? 'round0-logistic-minilm', mergeSmallStrata: true, roleSplit: { train: 0.2, calibration: 0.4, test: 0.4 } } as const;
+  const designOptions = { frame, scoreBands: [0.9, 0.7], scoringModel: sampleOptions.stratify?.name ?? 'round0-logistic-minilm', mergeSmallStrata: true, roleSplit: sampleOptions.roleSplit ?? { train: 0.2, calibration: 0.4, test: 0.4 } } as const;
 
   // Pilot round (proportional, labelled): per-stratum positive rates that size the main sample.
   const pilot = designSample({ ...designOptions, allocation: { total: 600, method: 'proportional' }, seed: 101 + offset });
@@ -129,7 +153,8 @@ export async function buildRound(seed: number, ctx: Context, sampleOptions: Samp
   const required = requiredSampleSize({ ...designOptions, allocation: sizing });
   const proportional = sampleOptions.method === 'proportional';
   const total = Math.min(frame.length, proportional ? sampleOptions.total ?? 2400 : Math.max(required, sampleOptions.total ?? 2400));
-  const main = proportional && sampleOptions.topFactor && sampleOptions.topFactor !== 1
+  const main = sampleOptions.neyman ? neymanSample(designOptions, total, 202 + offset)
+    : proportional && sampleOptions.topFactor && sampleOptions.topFactor !== 1
     ? oversampledTop(designOptions, total, sampleOptions.topFactor, 202 + offset)
     : designSample({ ...designOptions, allocation: proportional ? { total, method: 'proportional' } : { total, method: 'expected-positives', ...sizing }, seed: 202 + offset });
   log(`main design ${main.designId}: ${main.records.length} of ${frame.length} frame messages (expected-positives sizing asked for ${required})`);

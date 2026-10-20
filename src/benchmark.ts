@@ -19,9 +19,9 @@ import { Worker } from 'node:worker_threads';
 import { decisionFunction, seededRandom } from '@liquidau/solvers';
 
 import { loadBanking77 } from './data.ts';
-import { makeEmbedder, MODEL, SMALL_MODEL } from './embed.ts';
+import { makeEmbedder, MINILM_MODEL, MPNET_MODEL } from './embed.ts';
 
-const PUBLISHED: Record<string, number> = { [SMALL_MODEL]: 80.04, [MODEL]: 81.7 };
+const PUBLISHED: Record<string, number> = { [MINILM_MODEL]: 80.04, [MPNET_MODEL]: 81.7 };
 const EXPERIMENTS = 10, PER_LABEL = 8;
 
 const messages = await loadBanking77();
@@ -41,7 +41,7 @@ const fitAll = async (X: number[][], labels: number[]) => {
   return parts.flat().sort((a, b) => a.target - b.target);
 };
 
-for (const model of [SMALL_MODEL, MODEL]) {
+for (const model of [MINILM_MODEL, MPNET_MODEL]) {
   const embedder = await makeEmbedder(() => {}, model);
   const vec = new Map((await embedder.embedMany(messages.map((m) => m.text))).map((v, i) => [messages[i].id, v]));
   const accuracies: number[] = [];

@@ -10,7 +10,7 @@ import {
 import { buildRuleSet, certifyFalseAlarms, hitMatrix, mineRules, ruleSetMatcher, validateRules, type RecordLike } from '@liquidau/rule-miner';
 import { decisionFunction, fitLogistic, seededRandom, sigmoid } from '@liquidau/solvers';
 
-import { oversampledTop, pct, type SampleOptions } from './pipeline.ts';
+import { neymanSample, oversampledTop, pct, type SampleOptions } from './pipeline.ts';
 import { TC_HEADS, type Prompt, type TcHead } from './toxicchat.ts';
 
 export const lengthBucket = (text: string) => { const n = text.split(/\s+/).length; return n <= 8 ? 'short' : n <= 40 ? 'medium' : 'long'; };
@@ -37,7 +37,7 @@ export interface TcContext {
  * `expected-positives` sizes the sample from a 300-prompt proportional pilot so every stratum holding
  * a material share of either head's positives expects 6 calibration positives, at least `total`.
  */
-export interface TcSampleOptions extends Pick<SampleOptions, 'stratify' | 'topFactor'> { method?: 'proportional' | 'expected-positives'; total?: number }
+export interface TcSampleOptions extends Pick<SampleOptions, 'stratify' | 'topFactor' | 'roleSplit' | 'neyman'> { method?: 'proportional' | 'expected-positives'; total?: number }
 
 export function buildToxicRound(seed: number, ctx: TcContext, sampleOptions: TcSampleOptions = {}) {
   const { trainFile, byId, emb } = ctx;
@@ -76,7 +76,7 @@ export function buildToxicRound(seed: number, ctx: TcContext, sampleOptions: TcS
   const round0 = fitLogistic(hist.map(emb), hist.map((p) => p.truth.toxic), { C: 1, classWeight: 'balanced' });
   const stratScore = sampleOptions.stratify?.fit(hist) ?? ((p: Prompt) => sigmoid(decisionFunction(round0, emb(p))));
   const frame: FrameItem[] = frameSet.map((p) => ({ id: p.id, text: p.text, group: p.group, signals: { ruleFires: candidateMatcher.match(p.text) !== null, score: stratScore(p), slice: lengthBucket(p.text) } }));
-  const designOptions = { frame, scoreBands: [0.9, 0.5], scoringModel: sampleOptions.stratify?.name ?? 'round0-logistic-mpnet', mergeSmallStrata: true, roleSplit: { train: 0.2, calibration: 0.4, test: 0.4 } } as const;
+  const designOptions = { frame, scoreBands: [0.9, 0.5], scoringModel: sampleOptions.stratify?.name ?? 'round0-logistic-mpnet', mergeSmallStrata: true, roleSplit: sampleOptions.roleSplit ?? { train: 0.2, calibration: 0.4, test: 0.4 } } as const;
   const requested = Math.min(frame.length, sampleOptions.total ?? 1800);
   let main: ReturnType<typeof designSample>;
   let pilotLabels = 0;
@@ -92,7 +92,9 @@ export function buildToxicRound(seed: number, ctx: TcContext, sampleOptions: TcS
     const sizing = { priors, minExpectedPositives: 6 };
     const total = Math.min(frame.length, Math.max(requiredSampleSize({ ...designOptions, allocation: sizing }), requested));
     main = designSample({ ...designOptions, allocation: { total, method: 'expected-positives', ...sizing }, seed: 202 + offset });
-  } else if (sampleOptions.topFactor && sampleOptions.topFactor !== 1) {
+  } else if (sampleOptions.neyman) {
+    main = neymanSample(designOptions, requested, 202 + offset);
+} else if (sampleOptions.topFactor && sampleOptions.topFactor !== 1) {
     main = oversampledTop(designOptions, requested, sampleOptions.topFactor, 202 + offset);
   } else {
     main = designSample({ ...designOptions, allocation: { total: requested, method: 'proportional' }, seed: 202 + offset });
